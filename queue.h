@@ -12,6 +12,9 @@
  */
 
 #include <stdbool.h>
+#define list_for_each_safe(pos, n, head)                   \
+    for (pos = (head)->next, n = pos->next; pos != (head); \
+         pos = n, n = pos->next)
 
 /************** Data structure declarations ****************/
 
@@ -21,12 +24,14 @@ typedef struct ELE {
        This array needs to be explicitly allocated and freed */
     char *value;
     struct ELE *next;
+    struct ELE *prev;
 } list_ele_t;
 
 /* Queue structure */
 typedef struct {
     list_ele_t *head; /* Linked list of elements */
-    list_ele_t *tail;
+                      // in circular linked list tail pointer is useless
+    // list_ele_t *tail;
     int size;
     /* You will need to add more fields to this structure
        to efficiently implement q_size and q_insert_tail */

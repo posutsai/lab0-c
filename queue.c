@@ -28,7 +28,6 @@ queue_t *q_new()
     /* What if malloc returned NULL? */
     if (q == NULL)
         return NULL;
-    q->tail = NULL;
     q->head = NULL;
     q->size = 0;
     return q;
@@ -43,11 +42,10 @@ void q_free(queue_t *q)
             free(q);
             return;
         }
-        for (list_ele_t *cur = q->head; cur != NULL;) {
-            list_ele_t *tmp = cur->next;
-            free(cur);
-            cur = tmp;
-        }
+        list_ele_t *cur;
+        list_ele_t *tmp;
+        list_for_each_safe(cur, tmp, q->head) { free(cur); }
+        free(q->head);
         /* Free queue structure */
         free(q);
     }
@@ -75,10 +73,18 @@ bool q_insert_head(queue_t *q, char *s)
     /* What if either call to malloc returns NULL? */
     if (q->head == NULL) {
         q->head = newh;
-        q->tail = newh;
-        newh->next = NULL;
+        newh->next = newh;
+        newh->prev = newh;
     } else {
+        // from new head to left
+        newh->prev = q->head->prev;
+        // from left to new head
+        q->head->prev->next = newh;
+        // from old head to new head
+        q->head->prev = newh;
+        // from new head to old head
         newh->next = q->head;
+
         q->head = newh;
     }
     q->size++;
@@ -105,12 +111,23 @@ bool q_insert_tail(queue_t *q, char *s)
     }
     newt->next = NULL;
     newt->value = strdup(s);
-    if (q->tail == NULL) {
+    if (q->head == NULL) {
         q->head = newt;
-        q->tail = newt;
+        newt->next = newt;
+        newt->prev = newt;
     } else {
-        q->tail->next = newt;
-        q->tail = newt;
+        // from new tail to left
+        newt->prev = q->head->prev;
+        // from left to new tail
+        q->head->prev->next = newt;
+        // from old tail to new tail
+        q->head->prev = newt;
+        // from new tail to old tail
+        newt->next = q->head;
+
+        // [note !!!!]
+        // the difference between q_insert_head and q_insert_tail is without
+        // assigning q->head to the new node.
     }
     q->size++;
     return true;
@@ -130,7 +147,15 @@ bool q_remove_head(queue_t *q, char *sp, size_t bufsize)
     if (q == NULL || q->size == 0)
         return false;
     list_ele_t *tmp = q->head;
-    q->head = q->head->next;
+    if (q->size > 1) {
+        list_ele_t *left = tmp->prev;
+        list_ele_t *right = tmp->next;
+        left->next = right;
+        right->prev = left;
+        q->head = q->head->next;
+    } else if (q->size == 1) {
+        q->head = NULL;
+    }
     int copy_len = bufsize / sizeof(char) - 1;
     if (sp != NULL) {
         memcpy(sp, tmp->value, copy_len);
@@ -138,8 +163,6 @@ bool q_remove_head(queue_t *q, char *sp, size_t bufsize)
     }
     free(tmp);
     q->size--;
-    if (q->size == 0)
-        q->tail = NULL;
     return true;
 }
 
@@ -168,20 +191,17 @@ void q_reverse(queue_t *q)
 {
     if (q == NULL || q->size <= 1)
         return;
-
-    list_ele_t *before_node = q->head;
-    list_ele_t *cur_node = before_node->next;
-    list_ele_t *next_node = NULL;
-    before_node->next = NULL;
-    while (cur_node->next != NULL) {
-        next_node = cur_node->next;
-        cur_node->next = before_node;
-        before_node = cur_node;
-        cur_node = next_node;
+    list_ele_t *tail = q->head->prev;
+    list_ele_t *cur;
+    list_ele_t *n;
+    list_for_each_safe(cur, n, q->head)
+    {
+        list_ele_t *tmp = cur->next;
+        cur->next = cur->prev;
+        cur->prev = tmp;
     }
-    cur_node->next = before_node;
-    list_ele_t *tmp = q->tail;
-    q->tail = q->head;
-    q->head = tmp;
-    /* You need to write the code for this function */
+    list_ele_t *tmp = q->head->next;
+    q->head->next = q->head->prev;
+    q->head->prev = tmp;
+    q->head = tail;
 }
